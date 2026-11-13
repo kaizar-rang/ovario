@@ -100,6 +100,21 @@ function resize(){
 addEventListener('resize',resize);resize();
 
 const TAU=Math.PI*2, R=1650;
+// ---------- balance ----------
+const BAL={
+  playerBiteMul:1.4,   // player bites hit harder
+  playerBiteReach:9,   // extra bite hitbox radius for the player
+  botBiteReach:2,      // extra bite hitbox radius for bots
+  dmgToPlayerMul:0.7,  // all damage the player takes is scaled
+  killHeal:0.35,       // killer heals this fraction of max HP
+  maxPlayerHunters:2,  // at most this many bots hunt the player at once
+  botStartStatMax:4,   // initial bots get 0..N-1 points per stat
+  botFleeHp:0.25,      // bots flee below this HP fraction
+  botAimJitter:28,     // bots aim imperfectly at tails
+  turretDmg:5, turretCd:1.4, turretRange:460, turretTurn:1.8,
+  spawnInvuln:4,
+  minTailSegs:7        // wounded cells keep a longer, biteable tail
+};
 const rand=(a,b)=>a+Math.random()*(b-a);
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 const hsl=(h,s,l,a=1)=>`hsla(${h|0},${s}%,${clamp(l,0,100)|0}%,${a})`;
@@ -146,7 +161,7 @@ const maxHp=e=>e.c.hp*(1+0.05*e.st.b);
 const atk=e=>e.c.atk*(1+0.06*e.st.r);
 const spd=e=>e.c.speed*(1+0.4*(1-Math.exp(-e.st.y/14)));
 const spacing=e=>e.r*0.5+3;
-const visSegs=e=>Math.max(4,Math.ceil(e.c.segs*clamp(e.hp/maxHp(e),0,1)));
+const visSegs=e=>Math.max(BAL.minTailSegs,Math.ceil(e.c.segs*clamp(e.hp/maxHp(e),0,1)));
 
 function spawnPoint(minPlayerDist=650){
   for(let t=0;t<40;t++){
@@ -181,7 +196,7 @@ function uniqueBotName(){
 }
 function spawnBot(initial){
   const e=makeCell(uniqueBotName(),pick(CLASS_KEYS),false);
-  if(initial){e.st.r=(Math.random()*8)|0;e.st.b=(Math.random()*8)|0;e.st.y=(Math.random()*8)|0;
+  if(initial){e.st.r=(Math.random()*BAL.botStartStatMax)|0;e.st.b=(Math.random()*BAL.botStartStatMax)|0;e.st.y=(Math.random()*BAL.botStartStatMax)|0;
     e.hp=maxHp(e);e.score=(e.st.r+e.st.b+e.st.y)*10+((Math.random()*300)|0);e.invuln=0;}
   ents.push(e);return e;
 }
@@ -216,6 +231,7 @@ function pushFeed(t,c='#ddd'){feed.unshift({t,c,life:6});if(feed.length>5)feed.p
 // ---------- damage / death ----------
 function damage(b,dmg,src,x,y,segIdx){
   if(!b.alive||b.invuln>0)return;
+  if(b.isPlayer)dmg*=BAL.dmgToPlayerMul;
   b.hp-=dmg;b.hitFlash=0.18;b.lastHitT=3;
   if(segIdx!==undefined){for(let j=-1;j<=1;j++){const k=segIdx+j;if(k>=0&&k<b.flash.length)b.flash[k]=0.35;}}
   if(b.isPlayer){hurtT=0.35;floatText(x,y,'-'+Math.round(dmg),'#ff6b7d',15);}
@@ -236,7 +252,7 @@ function kill(b,src){
   }
   for(const g of eggs)if(g.owner===b){g.owner=null;g.hp=0;g.lock=0.6;}
   const killer=(src&&src.alive&&src!==b)?src:null;
-  if(killer){killer.kills++;killer.score+=150+Math.floor(b.score*0.2);
+  if(killer){killer.kills++;killer.hp=Math.min(maxHp(killer),killer.hp+maxHp(killer)*BAL.killHeal);killer.score+=150+Math.floor(b.score*0.2);
     if(killer.isPlayer){notify(`You dissolved ${b.name}!  +${150+Math.floor(b.score*0.2)}`,'#ffe08a');}
     pushFeed(`${killer.name}  ➜  ${b.name}`,killer.isPlayer||b.isPlayer?'#ffe08a':'#cfc6ef');
   } else pushFeed(`${b.name} dissolved`,'#cfc6ef');
@@ -314,18 +330,18 @@ function nearestOrb(e,maxD){
 function botThink(e,dt){
   e.aiT-=dt;e.commitT-=dt;
   // keep tracking current target smoothly
-  if(e.mode==='hunt'&&e.tgt&&e.tgt.alive&&e.tgt.rt.length>2){const s=e.tgt.rt[Math.floor(e.tgt.rt.length*0.6)];e.tx=s.x+e.tgt.vx*0.25;e.ty=s.y+e.tgt.vy*0.25;}
+  if(e.mode==='hunt'&&e.tgt&&e.tgt.alive&&e.tgt.rt.length>2){const s=e.tgt.rt[Math.floor(e.tgt.rt.length*0.6)];if(!e.jT||time>e.jT){e.jT=time+0.4;e.jx=rand(-1,1)*BAL.botAimJitter;e.jy=rand(-1,1)*BAL.botAimJitter;}e.tx=s.x+e.tgt.vx*0.2+e.jx;e.ty=s.y+e.tgt.vy*0.2+e.jy;}
   else if(e.mode==='orb'&&e.tgt){if(orbs.indexOf(e.tgt)<0)e.commitT=0;else{e.tx=e.tgt.x;e.ty=e.tgt.y;}}
   if(e.aiT>0)return;e.aiT=rand(0.15,0.3);
   const hpR=e.hp/maxHp(e);
   let threat=null,td=1e9,prey=null,ps=-1e9;
   for(const o of ents){if(o===e||!o.alive)continue;const dx=o.x-e.x,dy=o.y-e.y;if(Math.abs(dx)>700||Math.abs(dy)>700)continue;
     const d=Math.hypot(dx,dy);if(d<td){td=d;threat=o;}
-    if(d<600&&o.invuln<=0&&o.rt.length>2){const s=(1-o.hp/maxHp(o))*1.4+(atk(e)/atk(o))*0.3+(o.isPlayer?0.4*e.aggr:0)-d/600-(o.c.stealth?0.4:0);if(s>ps){ps=s;prey=o;}}}
+    if(d<600&&o.invuln<=0&&o.rt.length>2){const s=(1-o.hp/maxHp(o))*1.4+(atk(e)/atk(o))*0.3+(o.isPlayer?(huntersOfPlayer(e)>=BAL.maxPlayerHunters?-9:-0.15):0)-d/600-(o.c.stealth?0.4:0);if(s>ps){ps=s;prey=o;}}}
   // danger from enemy turrets when weak
   let turretDanger=null;
   for(const g of eggs)if(g.owner&&g.owner!==e&&!e.c.stealth&&Math.hypot(g.x-e.x,g.y-e.y)<560&&hpR<0.5){turretDanger=g;break;}
-  if((hpR<0.35&&threat&&td<420)||turretDanger){
+  if((hpR<BAL.botFleeHp&&threat&&td<420)||turretDanger){
     const src=turretDanger||threat;const dx=e.x-src.x,dy=e.y-src.y,d=Math.hypot(dx,dy)||1;
     e.mode='flee';e.tgt=null;e.tx=e.x+dx/d*450;e.ty=e.y+dy/d*450;e.wantBoost=d<280;e.commitT=0.6;
     for(const g of eggs)if(g.owner===e&&Math.hypot(g.x-e.x,g.y-e.y)<900&&Math.random()<0.5){e.tx=g.x+rand(-120,120);e.ty=g.y+rand(-120,120);}
@@ -353,6 +369,7 @@ function botThink(e,dt){
   else if(e.mode==='orb'&&e.tgt){e.tx=e.tgt.x;e.ty=e.tgt.y;}
   clampTarget(e);
 }
+function huntersOfPlayer(self){let n=0;for(const o of ents)if(o!==self&&o.alive&&!o.isPlayer&&o.mode==='hunt'&&o.tgt&&o.tgt.isPlayer)n++;return n;}
 function clampTarget(e){const d=Math.hypot(e.tx,e.ty),m=R-130;if(d>m){e.tx*=m/d;e.ty*=m/d;}}
 
 // ---------- combat ----------
@@ -369,9 +386,9 @@ function combat(){
         burst(a.x+nx*a.r,a.y+ny*a.r,'#fff',6,160,2.5,0.4);
       }
       if(a.biteCd>0||a.invuln>0||b.invuln>0)continue;
-      for(let i=2;i<b.rt.length;i++){const s=b.rt[i],ex=s.x-a.x,ey=s.y-a.y,lim=a.r+s.r;
+      for(let i=1;i<b.rt.length;i++){const s=b.rt[i],ex=s.x-a.x,ey=s.y-a.y,lim=a.r+s.r+(a.isPlayer?BAL.playerBiteReach:BAL.botBiteReach);
         if(ex*ex+ey*ey<lim*lim){
-          const dmg=atk(a)*(a.boosting?1.25:1);a.biteCd=0.35;
+          const dmg=atk(a)*(a.boosting?1.25:1)*(a.isPlayer?BAL.playerBiteMul:1);a.biteCd=0.35;
           const vl=Math.hypot(a.vx,a.vy)||1;b.kx+=a.vx/vl*140;b.ky+=a.vy/vl*140;a.kx-=a.vx/vl*80;a.ky-=a.vy/vl*80;
           burst(s.x,s.y,'#ff3b4f',10,200,3.2,0.6);burst(s.x,s.y,hsl(b.hue,b.sat,b.lit),6,140,2.5,0.5);
           damage(b,dmg,a,s.x,s.y,i);break;
@@ -387,10 +404,10 @@ function updateEggs(dt){
     if(g.owner){
       g.hp=Math.min(g.max,g.hp+5*dt);g.owner.score+=4*dt;g.fireCd-=dt;
       if(g.fireCd<=0){
-        let tg=null,bd=520;
+        let tg=null,bd=BAL.turretRange;
         for(const e of ents){if(!e.alive||e===g.owner||e.c.stealth||e.invuln>0)continue;const d=Math.hypot(e.x-g.x,e.y-g.y);if(d<bd){bd=d;tg=e;}}
-        if(tg){g.fireCd=1.05;g.flashT=0.2;const a=Math.atan2(tg.y-g.y,tg.x-g.x);
-          projs.push({x:g.x+Math.cos(a)*g.R,y:g.y+Math.sin(a)*g.R,vx:Math.cos(a)*400,vy:Math.sin(a)*400,owner:g.owner,tg,life:2.2,dmg:7,hue:g.owner.hue,sat:g.owner.sat,lit:g.owner.lit,rot:0});
+        if(tg){g.fireCd=BAL.turretCd;g.flashT=0.2;const a=Math.atan2(tg.y-g.y,tg.x-g.x);
+          projs.push({x:g.x+Math.cos(a)*g.R,y:g.y+Math.sin(a)*g.R,vx:Math.cos(a)*400,vy:Math.sin(a)*400,owner:g.owner,tg,life:2.2,dmg:BAL.turretDmg,hue:g.owner.hue,sat:g.owner.sat,lit:g.owner.lit,rot:0});
           burst(g.x+Math.cos(a)*g.R,g.y+Math.sin(a)*g.R,hsl(g.owner.hue,g.owner.sat,g.owner.lit+10),8,150,2.5,0.4);}
         else g.fireCd=0.3;
       }
@@ -420,7 +437,7 @@ function capture(g,e){
 }
 function updateProjs(dt){
   for(let i=projs.length-1;i>=0;i--){const p=projs[i];p.life-=dt;p.rot+=dt*8;
-    if(p.tg&&p.tg.alive){const want=Math.atan2(p.tg.y-p.y,p.tg.x-p.x),cur=Math.atan2(p.vy,p.vx),n=cur+clamp(angDiff(cur,want),-2.6*dt,2.6*dt);p.vx=Math.cos(n)*400;p.vy=Math.sin(n)*400;}
+    if(p.tg&&p.tg.alive){const want=Math.atan2(p.tg.y-p.y,p.tg.x-p.x),cur=Math.atan2(p.vy,p.vx),n=cur+clamp(angDiff(cur,want),-BAL.turretTurn*dt,BAL.turretTurn*dt);p.vx=Math.cos(n)*400;p.vy=Math.sin(n)*400;}
     p.x+=p.vx*dt;p.y+=p.vy*dt;
     if(Math.random()<dt*30)parts.push({x:p.x,y:p.y,vx:0,vy:0,life:0.3,max:0.3,s:2.5,c:hsl(p.hue,p.sat,p.lit+10)});
     let hit=false;
@@ -727,7 +744,7 @@ function startGame(){
   const name=(nickEl.value.trim()||'Player').slice(0,14);
   try{localStorage.setItem('ovumrush_nick',name);localStorage.setItem('ovumrush_class',selClass);}catch(_){}
   if(player){player.alive=false;ents=ents.filter(e=>e!==player);}
-  player=makeCell(name,selClass,true,spawnPoint(0));player.invuln=3;ents.push(player);
+  player=makeCell(name,selClass,true,spawnPoint(0));player.invuln=BAL.spawnInvuln;ents.push(player);
   cam.x=player.x;cam.y=player.y;mx=W/2+60;my=H/2;
   state='playing';bestRank=99;notes=[];feed=[];mouseBoost=keyBoost=touchBoost=false;
   menuEl.classList.add('hidden');overEl.classList.add('hidden');
