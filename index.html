@@ -48,6 +48,16 @@ canvas#game{display:block;position:fixed;left:0;top:0;width:100vw;height:100vh;c
 .stats span{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;opacity:.6}
 @media (max-width:720px){.classes{grid-template-columns:repeat(3,1fr)}.how{grid-template-columns:1fr}.panel{padding:18px}}
 @media (max-width:420px){.classes{grid-template-columns:repeat(2,1fr)}}
+#chat{position:fixed;left:16px;bottom:150px;width:min(330px,calc(100vw - 32px));z-index:11;font-size:13px;pointer-events:none}
+#chatLog{display:flex;flex-direction:column;gap:2px;margin-bottom:6px;max-height:190px;overflow:hidden;justify-content:flex-end}
+#chatLog div{background:rgba(10,5,30,.55);padding:3px 8px;border-radius:7px;line-height:1.35;color:#e8e2ff;word-wrap:break-word;transition:opacity .6s;text-shadow:0 1px 2px #000}
+#chatLog div.old{opacity:0}
+#chat.open #chatLog div.old{opacity:.85}
+#chatLog b{font-weight:800;margin-right:4px}
+#chatLog .me b{color:#fff}
+#chatIn{pointer-events:auto;width:100%;padding:8px 11px;border-radius:9px;border:1px solid rgba(190,150,255,.3);background:rgba(10,5,30,.75);color:#fff;font-size:13px;outline:none;opacity:.55}
+#chatIn:focus{opacity:1;border-color:rgba(255,215,106,.7)}
+@media (max-height:520px){#chat{bottom:120px}#chatLog{max-height:110px}}
 </style>
 </head>
 <body>
@@ -83,6 +93,7 @@ canvas#game{display:block;position:fixed;left:0;top:0;width:100vw;height:100vh;c
   </div>
 </div>
 
+<div id="chat" class="hidden"><div id="chatLog"></div><input id="chatIn" maxlength="90" autocomplete="off" placeholder="Press Enter to chat"></div>
 <script>
 (()=>{
 'use strict';
@@ -228,6 +239,57 @@ function floatText(x,y,t,c,size=14){texts.push({x,y,t,c,life:1,size});}
 function notify(t,c='#fff'){notes.unshift({t,c,life:3});if(notes.length>4)notes.pop();}
 function pushFeed(t,c='#ddd'){feed.unshift({t,c,life:6});if(feed.length>5)feed.pop();}
 
+// ---------- fake chat ----------
+const chatEl=document.getElementById('chat'),chatLog=document.getElementById('chatLog'),chatIn=document.getElementById('chatIn');
+const chatQ=[];let banterT=rand(3,6);
+const CHAT={
+  rage:['{k} you absolute tryhard','bro {k} has been chasing me for 5 minutes get a life','LAG. that was lag','{k} reported','are you kidding me','how did that even hit me??','{k} ur so bad that was pure luck','this game is so broken','ok {k} im coming for you','uninstalling','that tail hitbox is f***ing huge','wtf was that','nice teaming guys real cool','{k} no life','damn it','i was literally afk','i hate this game','{k} enjoy it while it lasts','oh hell no','that was BS and everyone knows it'],
+  gloat:['ez','sit down {v}','get rekt {v}','lol','{v} cry about it','too easy','skill issue','thanks for the snack {v}','imagine dying to me','{v} go back to the tutorial','next','{v} uninstall','who is {v} lmao'],
+  third:['lmao {v}','{k} is cracked','rip {v}','{k} stop farming kills','someone kill {k} already','{v} got DELETED','F for {v}','{k} sweating hard'],
+  egg:['WHO TOOK MY OVUM','{e} i swear to god','leave my egg alone {e}','{e} get the hell off my ovum','seriously {e}??','that was MY egg you rat'],
+  banter:['{a} stop following me','who keeps stealing my orbs','truce anyone?','{a} ur trash','no YOU are trash','why is everyone a tank','ghost mains are cowards','scouts are so damn annoying','lag anyone?','{a} truce?','truce my ass','this lobby is full of sweats','who even is {a}','the center ovum is mine','hell no its not','anyone elses mouse dying','{a} 1v1 me','1v1 me bro','bruh','{a} quit camping the egg','turrets are so op','stop biting my tail {a}','{a} you suck','lmao {a} keeps running','i will end you {a}','why am i getting hunted by everyone','{a} touch grass'],
+  replyInsult:['says the guy ranked #{r}','{p} talks a lot for someone with {n} kills','who asked {p}','cope','{p} come say that to my face','ratio','lol ok {p}','big words from {p}'],
+  replyGG:['gg','gg wp','gg {p}','not gg'],
+  replyQ:['idk man','nobody knows','google it','why are you asking me'],
+  replyTeam:['sure','lol no','deal','truce until i see your tail'],
+  reply:['ok {p}','shut up {p}','nobody cares {p}','lmao','{p} focus on the game','touch grass {p}','{p} who are you','?','ok and?','{p} ur next btw','real']
+};
+function fill(t,o){return t.replace(/\{(\w)\}/g,(_,k)=>o[k]??'');}
+function chatSay(e,text){
+  const d=document.createElement('div');if(e===player)d.className='me';
+  const b=document.createElement('b');b.textContent=e.name+':';b.style.color=e===player?'#fff':hsl(e.hue,e.sat,Math.max(e.lit,70));
+  d.append(b,document.createTextNode(text));d.t=time;chatLog.append(d);
+  while(chatLog.children.length>8)chatLog.firstChild.remove();
+}
+chatIn.addEventListener('focus',()=>chatEl.classList.add('open'));chatIn.addEventListener('blur',()=>chatEl.classList.remove('open'));
+function chatLater(e,text,delay){chatQ.push({e,text,t:time+delay});}
+function randBot(ex){const bs=ents.filter(o=>o.alive&&!o.isPlayer&&!ex.includes(o));return bs.length?pick(bs):null;}
+function chatOnKill(v,k){
+  if(!k)return;
+  if(!v.isPlayer&&Math.random()<0.75)chatLater(v,fill(pick(CHAT.rage),{k:k.name}),rand(0.6,2));
+  if(!k.isPlayer&&Math.random()<0.5)chatLater(k,fill(pick(CHAT.gloat),{v:v.name}),rand(0.4,1.6));
+  if(Math.random()<0.3){const o=randBot([v,k]);if(o)chatLater(o,fill(pick(CHAT.third),{k:k.name,v:v.name}),rand(1.5,3.5));}
+}
+function chatOnEgg(old,e){if(!old.isPlayer&&Math.random()<0.7)chatLater(old,fill(pick(CHAT.egg),{e:e.name}),rand(0.3,1.2));}
+function chatReply(msg){
+  const m=msg.toLowerCase(),p=player.name;
+  let pool=/\b(gg|good game)\b/.test(m)?CHAT.replyGG:/(noob|trash|bad|ez|suck|loser|bot)/.test(m)?CHAT.replyInsult:/(team|truce|friend|ally)/.test(m)?CHAT.replyTeam:/\?$/.test(m)?CHAT.replyQ:CHAT.reply;
+  const n=Math.random()<0.35?2:1,used=[];
+  for(let i=0;i<n;i++){
+    const named=ents.find(o=>!o.isPlayer&&o.alive&&m.includes(o.name.toLowerCase())&&!used.includes(o));
+    const b=named||randBot(used);if(!b)break;used.push(b);
+    chatLater(b,fill(pick(pool),{p,r:Math.max(1,board.indexOf(player)+1),n:player.kills}),rand(0.8,2.6)+i*1.2);
+  }
+}
+function updateChat(dt){
+  if(state==='menu')return;
+  for(let i=chatQ.length-1;i>=0;i--){const q=chatQ[i];if(time>=q.t){chatQ.splice(i,1);if(q.e.name)chatSay(q.e,q.text);}}
+  banterT-=dt;if(banterT<=0){banterT=rand(4,10);
+    const a=randBot([]),b=a&&randBot([a]);if(a&&b){const line=pick(CHAT.banter);chatSay(a,fill(line,{a:b.name}));
+      if(line.includes('{a}')&&Math.random()<0.6)chatLater(b,fill(pick(CHAT.reply),{p:a.name}),rand(1,2.5));}}
+  for(const d of chatLog.children)if(time-d.t>18)d.classList.add('old');
+}
+
 // ---------- damage / death ----------
 function damage(b,dmg,src,x,y,segIdx){
   if(!b.alive||b.invuln>0)return;
@@ -255,6 +317,7 @@ function kill(b,src){
   if(killer){killer.kills++;killer.hp=Math.min(maxHp(killer),killer.hp+maxHp(killer)*BAL.killHeal);killer.score+=150+Math.floor(b.score*0.2);
     if(killer.isPlayer){notify(`You dissolved ${b.name}!  +${150+Math.floor(b.score*0.2)}`,'#ffe08a');}
     pushFeed(`${killer.name}  ➜  ${b.name}`,killer.isPlayer||b.isPlayer?'#ffe08a':'#cfc6ef');
+    chatOnKill(b,killer);
   } else pushFeed(`${b.name} dissolved`,'#cfc6ef');
   if(b.isPlayer){state='dying';deathT=1.6;killedByName=killer?killer.name:'';}
   else respawnQ.push(rand(2.5,5));
@@ -423,7 +486,7 @@ function updateEggs(dt){
         if(e.isPlayer)floatText(g.x+nx*g.R,g.y+ny*g.R,Math.round(atk(e)*2),'#ffe08a');
         if(g.hp<=0){const old=g.owner;g.owner=null;g.hp=0;g.lock=0.8;e.score+=120;
           burst(g.x,g.y,'#ffe7a0',30,260,4,0.9);
-          if(old.isPlayer)notify(`${e.name} neutralized your Ovum!`,'#ff7a9a');
+          if(old.isPlayer)notify(`${e.name} neutralized your Ovum!`,'#ff7a9a');chatOnEgg(old,e);
           if(e.isPlayer)notify('Ovum neutralized! Touch it to claim it. +120','#ffe08a');}
       }
     }
@@ -488,6 +551,7 @@ function update(dt){
     moveCell(e,dt);
     if(e.minions.length)updateMinions(e,dt);
   }
+  updateChat(dt);
   combat();updateEggs(dt);updateProjs(dt);updateOrbs(dt);
   ents=ents.filter(e=>e.alive);
   for(let i=respawnQ.length-1;i>=0;i--){respawnQ[i]-=dt;if(respawnQ[i]<=0){respawnQ.splice(i,1);spawnBot(false);}}
@@ -747,7 +811,7 @@ function startGame(){
   player=makeCell(name,selClass,true,spawnPoint(0));player.invuln=BAL.spawnInvuln;ents.push(player);
   cam.x=player.x;cam.y=player.y;mx=W/2+60;my=H/2;
   state='playing';bestRank=99;notes=[];feed=[];mouseBoost=keyBoost=touchBoost=false;
-  menuEl.classList.add('hidden');overEl.classList.add('hidden');
+  menuEl.classList.add('hidden');overEl.classList.add('hidden');chatEl.classList.remove('hidden');
   notify(`Good luck, ${name}!  Fertilize the golden Ova.`,'#c9b6ff');
 }
 function showGameOver(){
@@ -762,7 +826,7 @@ function showGameOver(){
 }
 document.getElementById('play').onclick=startGame;
 document.getElementById('again').onclick=startGame;
-document.getElementById('toMenu').onclick=()=>{overEl.classList.add('hidden');menuEl.classList.remove('hidden');state='menu';};
+document.getElementById('toMenu').onclick=()=>{overEl.classList.add('hidden');menuEl.classList.remove('hidden');chatEl.classList.add('hidden');chatIn.blur();state='menu';};
 
 // ---------- input ----------
 addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;});
@@ -770,7 +834,13 @@ cv.addEventListener('mousedown',e=>{if(e.button===0)mouseBoost=true;});
 addEventListener('mouseup',e=>{if(e.button===0)mouseBoost=false;});
 addEventListener('blur',()=>{mouseBoost=keyBoost=touchBoost=false;});
 addEventListener('keydown',e=>{
+  if(document.activeElement===chatIn){
+    if(e.key==='Enter'){const t=chatIn.value.trim().slice(0,90);if(t&&player){chatSay(player,t);chatReply(t);}chatIn.value='';chatIn.blur();}
+    else if(e.key==='Escape'){chatIn.value='';chatIn.blur();}
+    return;
+  }
   if(e.code==='Space'&&document.activeElement!==nickEl){keyBoost=true;e.preventDefault();}
+  if(e.key==='Enter'&&(state==='playing'||state==='dying')){e.preventDefault();chatIn.focus();return;}
   if(e.key==='Enter'&&(state==='menu'&&!menuEl.classList.contains('hidden')||state==='dead'))startGame();
 });
 addEventListener('keyup',e=>{if(e.code==='Space')keyBoost=false;});
