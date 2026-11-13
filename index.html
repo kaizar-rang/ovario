@@ -242,19 +242,56 @@ function pushFeed(t,c='#ddd'){feed.unshift({t,c,life:6});if(feed.length>5)feed.p
 // ---------- fake chat ----------
 const chatEl=document.getElementById('chat'),chatLog=document.getElementById('chatLog'),chatIn=document.getElementById('chatIn');
 const chatQ=[];let banterT=rand(3,6);
-const CHAT={
-  rage:['{k} you absolute tryhard','bro {k} has been chasing me for 5 minutes get a life','LAG. that was lag','{k} reported','are you kidding me','how did that even hit me??','{k} ur so bad that was pure luck','this game is so broken','ok {k} im coming for you','uninstalling','that tail hitbox is f***ing huge','wtf was that','nice teaming guys real cool','{k} no life','damn it','i was literally afk','i hate this game','{k} enjoy it while it lasts','oh hell no','that was BS and everyone knows it'],
-  gloat:['ez','sit down {v}','get rekt {v}','lol','{v} cry about it','too easy','skill issue','thanks for the snack {v}','imagine dying to me','{v} go back to the tutorial','next','{v} uninstall','who is {v} lmao'],
-  third:['lmao {v}','{k} is cracked','rip {v}','{k} stop farming kills','someone kill {k} already','{v} got DELETED','F for {v}','{k} sweating hard'],
-  egg:['WHO TOOK MY OVUM','{e} i swear to god','leave my egg alone {e}','{e} get the hell off my ovum','seriously {e}??','that was MY egg you rat'],
-  banter:['{a} stop following me','who keeps stealing my orbs','truce anyone?','{a} ur trash','no YOU are trash','why is everyone a tank','ghost mains are cowards','scouts are so damn annoying','lag anyone?','{a} truce?','truce my ass','this lobby is full of sweats','who even is {a}','the center ovum is mine','hell no its not','anyone elses mouse dying','{a} 1v1 me','1v1 me bro','bruh','{a} quit camping the egg','turrets are so op','stop biting my tail {a}','{a} you suck','lmao {a} keeps running','i will end you {a}','why am i getting hunted by everyone','{a} touch grass'],
-  replyInsult:['says the guy ranked #{r}','{p} talks a lot for someone with {n} kills','who asked {p}','cope','{p} come say that to my face','ratio','lol ok {p}','big words from {p}'],
-  replyGG:['gg','gg wp','gg {p}','not gg'],
-  replyQ:['idk man','nobody knows','google it','why are you asking me'],
-  replyTeam:['sure','lol no','deal','truce until i see your tail'],
-  reply:['ok {p}','shut up {p}','nobody cares {p}','lmao','{p} focus on the game','touch grass {p}','{p} who are you','?','ok and?','{p} ur next btw','real']
+// Chat grammar: {I}=insult {J}=adjective {X}=exclamation {S}=intensifier, [a|b|c]=pick one (nestable), {k}{v}{e}{a}{p}{r}{n}=names/stats
+const VOCAB={
+  I:['tryhard','sweatlord','dipshit','dumbass','asshole','prick','clown','bitch','loser','shitter','dickhead','jackass','bozo','goblin','rat','moron','fuckwit','cockroach','muppet','bastard','sack of shit','NPC','waste of oxygen','fuckface','shithead','donkey','twat','numbnuts','knobhead','degenerate','tadpole','bottom feeder','dork','cretin','walking L','fucking bot','mouthbreather','pissbaby','crybaby','one-braincell amoeba','clown shoe','absolute weapon'],
+  J:['fucking','goddamn','absolute','braindead','sweaty','shit-tier','pathetic','dogshit','bitchass','dumbass','useless','washed','no-life','tryhard','spineless','smoothbrain','unemployed','cracked','greasy','scummy','trash','garbage','delusional'],
+  X:['wtf','what the fuck','are you fucking kidding me','holy shit','oh come ON','bullshit','fuck me','god fucking damn it','jesus christ','unreal','bro WHAT','fuck off','you gotta be shitting me','are you serious','no fucking way','ffs','oh my fucking god','christ almighty','fuck this','hell no','for fucks sake','unbelievable','kill me','i swear to god','lmfao what'],
+  S:['fucking','goddamn','literally','actually','genuinely','straight up','so fucking','100%','legit','fully']
 };
-function fill(t,o){return t.replace(/\{(\w)\}/g,(_,k)=>o[k]??'');}
+const CHAT={
+  rage:[
+    '{X} {k}','{k} you {J} {I}','{X}. {k} is such a {J} {I}','how the [fuck|hell] did that hit me','{X} that was LAG','{k} reported for being a {I}','this game is {S} broken','[ok|alright|fine] {k} [im coming for you|you are dead next life|watch your fucking tail|i know where you spawn]','uninstalling this [shit|garbage|crap] [game|]','that tail hitbox is {S} huge','nice teaming [you|] {J} [rats|cowards|losers]','{k} has no life [lmao|fr|honestly]','{X} i was [afk|tabbed out|getting water]','i [fucking|] hate this game','{k} enjoy it [you {I}|while it lasts|bitch]','that was [bullshit|horseshit|bs] and everyone [knows it|saw it]','{k} only kills people who are already [half dead|low|fighting]','{X} {X}','[my|this] [mouse|wifi|keyboard] is [shit|fucked|dogshit]','{k} [get a job|go outside|touch grass] you {I}','[cool|great|wonderful] [game|server|lobby] [lmao|lol|] [fuck this|kill me|]','{k} [i swear|i promise] im ending you','[jesus|holy shit|god] {k} [chill|relax|calm down] you {J} {I}','who the fuck [aims|bites] like that','[i was|we were] [literally|] [farming|chilling|minding my own business] {X}','[thats|that is] [it|enough] im [done|out|quitting]','{k} [i hope your|may your] [tail rot|mitochondria fail|wifi die]','{k} [you|u] [fucking|] [camper|rat|tail sniper]','[that|this] turret is {S} [op|broken|cancer]','[how|why] [am i|is everyone] [always|] getting [hunted|focused|ganked]'
+  ],
+  gloat:[
+    'ez','[ez|easy|too easy] [{v}|lmao|clap]','sit [the fuck|] down {v}','get [rekt|fucked|clapped|cooked] {v}','{v} cry about it','skill issue {v}','thanks for the [snack|free kill|orbs] {v}','imagine dying to me [lmao|{v}|]','{v} go back to the [tutorial|menu|petri dish]','next','{v} [uninstall|log off|quit] you {I}','who [the fuck|] is {v} [lmao|lol|]','{v} [ur|your] tail tasted like [shit|ass|garbage]','[sorry|my bad] {v} [lmao|not sorry|]','{v} [stay|keep] crying [{I}|bitch|]','[another one|delete]','[get|go get] [good|better] {v}','{v} played like a {J} {I}','[shut|zip] [up|it] {v} [lol|] [you lost|ur dead]','[lol|lmao] {v} really thought'
+  ],
+  third:[
+    '[lmao|lmfao|lol] {v}','{k} is {S} cracked','rip {v} [lol|o7|]','{k} [stop|quit] farming kills you {I}','someone [kill|end|delete] {k} [already|please|for fucks sake]','{v} got [DELETED|fucked|cooked|diffed]','F for {v}','{k} [sweating|tryharding] [so|] hard [lmao|jesus]','{v} [was|is] [actually|] {J} [lol|]','{k} [is a|absolute] {I} [lol|tbh|]','[lol|lmao] {v} [deserved that|had it coming]','{X} {k} [is|is just] [different|built different|a menace]'
+  ],
+  egg:[
+    'WHO [TOOK|STOLE] MY [OVUM|EGG]','{e} [i swear to god|im going to end you|you {J} {I}]','leave my egg [alone|the fuck alone] {e}','{e} get the [hell|fuck] off my ovum','[seriously|really|actually] {e}??','that was MY egg you [rat|{I}]','{X} {e} [stole|took] my egg','{e} [you|u] [egg stealing|thieving] {I}','[ok|right] {e} [war it is|youre dead|its on]'
+  ],
+  banter:[
+    '{a} stop [following|chasing|stalking] me [you {I}|creep|]','who keeps [stealing|eating] my [orbs|food]','truce anyone?','{a} [ur|you are] [trash|dogshit|garbage] [lol|]','no {a} YOU are [trash|the {I}]','why is everyone a [tank|ghost|scout]','[ghost|scout|tank|cluster] mains are [cowards|{J} {I}s|the worst]','scouts are so [damn|fucking] annoying','lag [anyone|for anyone else]?','{a} truce?','truce my [ass|fucking ass]','this lobby is full of [sweats|tryhards|{I}s]','who [even|the fuck] is {a}','the center ovum is mine','[hell|fuck] no [its not|it isnt]','{a} [quit|stop] camping the egg [you {I}|]','turrets are so [op|broken|fucking dumb]','[stop|quit] biting my tail {a}','{a} [you|u] [suck|blow|are dogshit]','[lmao|lol] {a} keeps running','i will [end|delete|eat] you {a}','{a} [touch grass|shower|go outside]','{a} [is|seems] [kinda|so] {J}','[anyone|who] wanna [team|truce] on {a}','{a} [1v1|fight] me [bro|coward|you {I}]','[bruh|bro|man]','{X}','{a} [has been|keeps] [stealing|taking] [kills|orbs|eggs] all game','[gg|this game] [is|is so] [rigged|cooked]','[i swear|swear to god] {a} is a [bot|hacker|{I}]','{a} why [are you|r u] like this','[who|what] [the fuck|] is [this|that] [shit|clown|]','{a} [you|u] [owe me|stole] [an egg|my kill]','[i|we] [should|gonna] [gang up on|focus] {a}'
+  ],
+  replyInsult:['says the [guy|{I}] ranked #{r}','{p} talks a lot for [someone|a {I}] with {n} kills','who [asked|the fuck asked] {p}','cope [harder|] {p}','{p} come say that to my [face|tail]','ratio [{p}|]','[lol|lmao] ok {p}','big words from {p} [lmao|the {I}|]','{p} [you|u] [literally|] have {n} kills [shut up|sit down|lmao]','[stfu|shut the fuck up] {p}','{p} [is|sounds] [mad|pressed|salty] [lol|af|]','[keep|] [crying|typing] {p} [lmao|]','#{r} [btw|lmao] {p}','{p} [ur|your] [mom|tail] [lol|]','[imagine|bro] being #{r} and talking'],
+  replyGG:['gg','gg wp','gg {p}','not gg','[gg|ggs] [ez|lol|]','gg [{p}|] [now die|ur next]','[no|nah] [fuck|] gg'],
+  replyQ:['idk [man|bro|]','nobody knows','google it','why [are you|r u] asking me','[figure it out|look it up] {p}','{p} [i dont|idgaf|who cares]','[ask|go ask] someone who [cares|gives a shit]'],
+  replyTeam:['sure','lol no','deal','truce until i see your tail','[fuck|hell] no {p}','[sure|ok] [{p}|] [lol|] [not]','[maybe|depends] [lol|]','truce [lmao|] [never|ok fine]'],
+  reply:['ok {p}','[shut up|stfu|shut the fuck up] {p}','nobody [cares|gives a shit] {p}','[lmao|lol|lmfao]','{p} focus on the game','[touch grass|go outside] {p}','{p} who [are you|tf are you]','?','ok and?','{p} ur next btw','real','{p} [ur|youre] a {I}','[bro|{p}] [nobody|no one] asked','[cry|seethe|cope] {p}','{p} [is|sounds] [mad|pressed|tilted]','{p} [i|we] know where [you are|ur tail is]','[k|ok|kk]','{p} [cool|great] [story|] [bro|]','{p} [lmao|] [what|huh]','[imagine|bro] typing that','{X} {p}']
+};
+const recentLines=[];
+function expand(t,o){
+  for(let g=0;g<3;g++)t=t.replace(/\{([IJXS])\}/g,(_,k)=>pick(VOCAB[k]));
+  let prev;do{prev=t;t=t.replace(/\[([^\[\]]*)\]/g,(_,a)=>pick(a.split('|')));}while(t!==prev);
+  return t.replace(/\{(\w)\}/g,(_,k)=>o[k]??'').replace(/\s+/g,' ').trim();
+}
+function stylize(t){
+  const r=Math.random();
+  if(r<0.42)t=t.toLowerCase();else if(r<0.5)t=t.toUpperCase();
+  if(Math.random()<0.12)t=t.replace(/([aeiouhs])(\W|$)/i,(_,c,e)=>c.repeat(3+(Math.random()*4|0))+e);
+  if(Math.random()<0.07&&t.length>6){const i=1+(Math.random()*(t.length-3)|0);t=t.slice(0,i)+t[i+1]+t[i]+t.slice(i+2);}
+  if(Math.random()<0.25)t+=' '+pick(['lol','lmao','smh','fr','bro','ffs','tbh','💀','😂','🤡','!!!','??','...','ngl','omfg','istg']);
+  else if(Math.random()<0.2)t=t.replace(/[.!?]*$/,pick(['!','!!','?!','.','!!!!']));
+  return t;
+}
+function gen(pool,o){
+  let t='';
+  for(let i=0;i<8;i++){t=expand(pick(pool),o);if(!recentLines.includes(t.toLowerCase()))break;}
+  recentLines.push(t.toLowerCase());if(recentLines.length>40)recentLines.shift();
+  return stylize(t);
+}
 function chatSay(e,text){
   const d=document.createElement('div');if(e===player)d.className='me';
   const b=document.createElement('b');b.textContent=e.name+':';b.style.color=e===player?'#fff':hsl(e.hue,e.sat,Math.max(e.lit,70));
@@ -266,11 +303,11 @@ function chatLater(e,text,delay){chatQ.push({e,text,t:time+delay});}
 function randBot(ex){const bs=ents.filter(o=>o.alive&&!o.isPlayer&&!ex.includes(o));return bs.length?pick(bs):null;}
 function chatOnKill(v,k){
   if(!k)return;
-  if(!v.isPlayer&&Math.random()<0.75)chatLater(v,fill(pick(CHAT.rage),{k:k.name}),rand(0.6,2));
-  if(!k.isPlayer&&Math.random()<0.5)chatLater(k,fill(pick(CHAT.gloat),{v:v.name}),rand(0.4,1.6));
-  if(Math.random()<0.3){const o=randBot([v,k]);if(o)chatLater(o,fill(pick(CHAT.third),{k:k.name,v:v.name}),rand(1.5,3.5));}
+  if(!v.isPlayer&&Math.random()<0.75)chatLater(v,gen(CHAT.rage,{k:k.name}),rand(0.6,2));
+  if(!k.isPlayer&&Math.random()<0.5)chatLater(k,gen(CHAT.gloat,{v:v.name}),rand(0.4,1.6));
+  if(Math.random()<0.3){const o=randBot([v,k]);if(o)chatLater(o,gen(CHAT.third,{k:k.name,v:v.name}),rand(1.5,3.5));}
 }
-function chatOnEgg(old,e){if(!old.isPlayer&&Math.random()<0.7)chatLater(old,fill(pick(CHAT.egg),{e:e.name}),rand(0.3,1.2));}
+function chatOnEgg(old,e){if(!old.isPlayer&&Math.random()<0.7)chatLater(old,gen(CHAT.egg,{e:e.name}),rand(0.3,1.2));}
 function chatReply(msg){
   const m=msg.toLowerCase(),p=player.name;
   let pool=/\b(gg|good game)\b/.test(m)?CHAT.replyGG:/(noob|trash|bad|ez|suck|loser|bot)/.test(m)?CHAT.replyInsult:/(team|truce|friend|ally)/.test(m)?CHAT.replyTeam:/\?$/.test(m)?CHAT.replyQ:CHAT.reply;
@@ -278,15 +315,15 @@ function chatReply(msg){
   for(let i=0;i<n;i++){
     const named=ents.find(o=>!o.isPlayer&&o.alive&&m.includes(o.name.toLowerCase())&&!used.includes(o));
     const b=named||randBot(used);if(!b)break;used.push(b);
-    chatLater(b,fill(pick(pool),{p,r:Math.max(1,board.indexOf(player)+1),n:player.kills}),rand(0.8,2.6)+i*1.2);
+    chatLater(b,gen(pool,{p,r:Math.max(1,board.indexOf(player)+1),n:player.kills}),rand(0.8,2.6)+i*1.2);
   }
 }
 function updateChat(dt){
   if(state==='menu')return;
   for(let i=chatQ.length-1;i>=0;i--){const q=chatQ[i];if(time>=q.t){chatQ.splice(i,1);if(q.e.name)chatSay(q.e,q.text);}}
   banterT-=dt;if(banterT<=0){banterT=rand(4,10);
-    const a=randBot([]),b=a&&randBot([a]);if(a&&b){const line=pick(CHAT.banter);chatSay(a,fill(line,{a:b.name}));
-      if(line.includes('{a}')&&Math.random()<0.6)chatLater(b,fill(pick(CHAT.reply),{p:a.name}),rand(1,2.5));}}
+    const a=randBot([]),b=a&&randBot([a]);if(a&&b){const line=gen(CHAT.banter,{a:b.name});chatSay(a,line);
+      if(line.toLowerCase().includes(b.name.toLowerCase())&&Math.random()<0.6)chatLater(b,gen(CHAT.reply,{p:a.name}),rand(1,2.5));}}
   for(const d of chatLog.children)if(time-d.t>18)d.classList.add('old');
 }
 
