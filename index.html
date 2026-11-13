@@ -55,6 +55,7 @@ canvas#game{display:block;position:fixed;left:0;top:0;width:100vw;height:100vh;c
 #chat.open #chatLog div.old{opacity:.85}
 #chatLog b{font-weight:800;margin-right:4px}
 #chatLog .me b{color:#fff}
+#chatLog .sys{color:#ff6b7d;font-weight:800;background:rgba(80,0,20,.55)}
 #chatIn{pointer-events:auto;width:100%;padding:8px 11px;border-radius:9px;border:1px solid rgba(190,150,255,.3);background:rgba(10,5,30,.75);color:#fff;font-size:13px;outline:none;opacity:.55}
 #chatIn:focus{opacity:1;border-color:rgba(255,215,106,.7)}
 #ovaPanel{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);z-index:11;width:min(560px,calc(100vw - 32px));background:rgba(15,8,38,.85);border:1px solid rgba(255,215,106,.35);border-radius:14px;padding:10px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
@@ -315,6 +316,13 @@ const CHAT={
   replyTeam:['sure','lol no','deal','truce until i see your tail','[fuck|hell] no {p}','[sure|ok] [{p}|] [lol|] [not]','[maybe|depends] [lol|]','truce [lmao|] [never|ok fine]'],
   reply:['ok {p}','[shut up|stfu|shut the fuck up] {p}','nobody [cares|gives a shit] {p}','[lmao|lol|lmfao]','{p} focus on the game','[touch grass|go outside] {p}','{p} who [are you|tf are you]','?','ok and?','{p} ur next btw','real','{p} [ur|youre] a {I}','[bro|{p}] [nobody|no one] asked','[cry|seethe|cope] {p}','{p} [is|sounds] [mad|pressed|tilted]','{p} [i|we] know where [you are|ur tail is]','[k|ok|kk]','{p} [cool|great] [story|] [bro|]','{p} [lmao|] [what|huh]','[imagine|bro] typing that','{X} {p}']
 };
+CHAT.cuss=['watch your [fucking|] mouth {p}','{p} [you kiss your mother with that mouth|who taught you to talk like that]?','say that again {p} [i dare you|see what happens]','big [talk|words] from a {I} with {n} kills','{p} im coming for your tail [RIGHT NOW|next|first]','who the [fuck|hell] are you talking to {p}','{p} keep [crying|typing] you {J} {I}','mad cuz bad {p}','{p} you type like a {I}','ok {p} you just made [the list|my list|an enemy]','{p} the fuck did you just say [to me|]','{p} [ranked|sitting at] #{r} and talking [shit|like that] [lmao|]','[oh|ooh] {p} got [a mouth|some nerve] [huh|on them]','{p} [shut the fuck up|stfu] and play','come here {p} [you little {I}|tough guy]','{p} [i will|im gonna] [eat|delete|end] you','[lol|lmao] {p} is tilted','{p} [say|talk] that [shit|crap] to my face','[keep|go ahead,] [running your mouth|talking] {p} [see what happens|ur dead]','{p} [ur|you are] a {J} {I} and everyone knows it'];
+CHAT.slur=['what the fuck is wrong with you {p}','{p} get the fuck out of this lobby','nobody wants your bigoted ass here {p}','reported. enjoy the ban {p}','[everyone|all truces off,] [kill|go after|hunt] {p}','{p} [you are|youre] a [fucking|] disgrace','{p} [crawl back under|go back to] whatever rock you came from','zero tolerance. {p} is getting hunted','{p} log off and [reflect on your life|grow up|get help]','[mods|admin] ban {p} [now|immediately|please]','{p} hope you enjoyed your last game here','not funny. never was. [get lost|fuck off] {p}','[holy shit|jesus christ] {p}. [seriously|really]?','{p} [said that|typed that] with their whole chest. [pathetic|disgusting]','{p} [youre|you are] [genuinely|actually] [vile|pathetic|disgusting]','[nah|no].  {p} is done. everyone on {p}','imagine being that [pathetic|insecure|miserable] {p}','{p} [screenshotted|clipped] and reported','{p} [go touch grass|grow a brain] [and stay offline|you absolute loser]','[yikes|ew]. [blocked|reported] {p}'];
+const SLUR_RE=/\bn+[i]+g{2,}(?:a|ah|az|as|er|ers|uh|let|guh)\b|\bf+a+g+(?:s|ot|ots|got|gots|gy|gat)?\b|\bretard(?:s|ed)?\b|\btrann(?:y|ies)\b|\bchinks?\b|\bspics?\b|\bkikes?\b|\bwetbacks?\b|\bgooks?\b|\bdykes?\b|\bcoons?\b|\bbeaners?\b|\bpakis?\b|\bsand\s?n+i+g{2,}/g;
+const CUSS_RE=/f+u+c+k|\bfk\b|\bfck|sh+i+t|bitch|cunt|\bass\b|asshole|dick|bastard|\bwtf\b|\bstfu\b|piss|damn|prick|twat|wank|bollocks|\bcock|motherf|\bmf\b|\bkys\b|\bhoe\b|slut|whore/;
+const LEET={'1':'i','!':'i','|':'i','3':'e','4':'a','@':'a','0':'o','$':'s','5':'s','7':'t','8':'b'};
+const normChat=t=>t.toLowerCase().replace(/[1!|3@40$578]/g,c=>LEET[c]);   // 1:1 so indices line up
+let lastBotChat=-9;
 const recentLines=[];
 function expand(t,o){
   for(let g=0;g<3;g++)t=t.replace(/\{([IJXS])\}/g,(_,k)=>pick(VOCAB[k]));
@@ -330,12 +338,13 @@ function stylize(t){
   else if(Math.random()<0.2)t=t.replace(/[.!?]*$/,pick(['!','!!','?!','.','!!!!']));
   return t;
 }
-function gen(pool,o){
+function gen(pool,o,plain){
   let t='';
   for(let i=0;i<8;i++){t=expand(pick(pool),o);if(!recentLines.includes(t.toLowerCase()))break;}
   recentLines.push(t.toLowerCase());if(recentLines.length>40)recentLines.shift();
-  return stylize(t);
+  return plain?(Math.random()<0.4?t.toLowerCase():t):stylize(t);
 }
+function chatSys(text){const d=document.createElement('div');d.className='sys';d.textContent=text;d.t=time;chatLog.append(d);while(chatLog.children.length>8)chatLog.firstChild.remove();}
 function chatSay(e,text){
   const d=document.createElement('div');if(e===player)d.className='me';
   const b=document.createElement('b');b.textContent=e.name+':';b.style.color=e===player?'#fff':hsl(e.hue,e.sat,Math.max(e.lit,70));
@@ -343,29 +352,50 @@ function chatSay(e,text){
   while(chatLog.children.length>8)chatLog.firstChild.remove();
 }
 chatIn.addEventListener('focus',()=>chatEl.classList.add('open'));chatIn.addEventListener('blur',()=>chatEl.classList.remove('open'));
-function chatLater(e,text,delay){chatQ.push({e,text,t:time+delay});}
+function chatLater(e,text,delay,prio){chatQ.push({e,text,t:time+delay,due:time+delay,prio});}
 function randBot(ex){const bs=ents.filter(o=>o.alive&&!o.isPlayer&&!ex.includes(o));return bs.length?pick(bs):null;}
 function chatOnKill(v,k){
   if(!k)return;
-  if(!v.isPlayer&&Math.random()<0.75)chatLater(v,gen(CHAT.rage,{k:k.name}),rand(0.6,2));
-  if(!k.isPlayer&&Math.random()<0.5)chatLater(k,gen(CHAT.gloat,{v:v.name}),rand(0.4,1.6));
-  if(Math.random()<0.3){const o=randBot([v,k]);if(o)chatLater(o,gen(CHAT.third,{k:k.name,v:v.name}),rand(1.5,3.5));}
+  const mine=v.isPlayer||k.isPlayer;
+  if(!v.isPlayer&&Math.random()<(mine?0.8:0.12))chatLater(v,gen(CHAT.rage,{k:k.name}),rand(0.8,2.5),mine);
+  if(!k.isPlayer&&Math.random()<(mine?0.55:0.06))chatLater(k,gen(CHAT.gloat,{v:v.name}),rand(0.6,2),mine);
+  if(Math.random()<(mine?0.25:0.03)){const o=randBot([v,k]);if(o)chatLater(o,gen(CHAT.third,{k:k.name,v:v.name}),rand(1.5,3.5));}
 }
-function chatOnEgg(old,e){if(!old.isPlayer&&Math.random()<0.7)chatLater(old,gen(CHAT.egg,{e:e.name}),rand(0.3,1.2));}
-function chatReply(msg){
-  const m=msg.toLowerCase(),p=player.name;
+function chatOnEgg(old,e){const mine=e.isPlayer;if(!old.isPlayer&&Math.random()<(mine?0.8:0.25))chatLater(old,gen(CHAT.egg,{e:e.name}),rand(0.5,1.5),mine);}
+function chatReply(msg,m0){
+  const m=m0||msg.toLowerCase(),p=player.name,o={p,r:Math.max(1,board.indexOf(player)+1),n:player.kills};
+  SLUR_RE.lastIndex=0;
+  if(SLUR_RE.test(m)){
+    const bs=ents.filter(e=>e.alive&&!e.isPlayer);const n=Math.min(bs.length,3+(Math.random()*3|0)),used=[];
+    for(let i=0;i<n;i++){const b=randBot(used);if(!b)break;used.push(b);chatLater(b,gen(CHAT.slur,o,true),0.5+i*rand(0.5,1.1),true);}
+    setTimeout(()=>chatSys(`⚠ ${p} was reported by ${n+2+(Math.random()*6|0)} players`),900);
+    player.pariahT=30;notify('The whole lobby is hunting you','#ff6b7d');
+    for(const b of bs)if(Math.hypot(b.x-player.x,b.y-player.y)<1400){b.mode='hunt';b.tgt=player;b.commitT=rand(5,9);b.aggr=1;}
+    return;
+  }
+  if(CUSS_RE.test(m)){
+    const n=2+(Math.random()<0.45?1:0),used=[];
+    for(let i=0;i<n;i++){const named=ents.find(x=>!x.isPlayer&&x.alive&&m.includes(x.name.toLowerCase())&&!used.includes(x));
+      const b=named||randBot(used);if(!b)break;used.push(b);chatLater(b,gen(CHAT.cuss,o),rand(0.6,1.6)+i*rand(0.8,1.5),true);
+      if(i===0&&Math.hypot(b.x-player.x,b.y-player.y)<1600){b.mode='hunt';b.tgt=player;b.commitT=rand(4,7);}}
+    return;
+  }
   let pool=/\b(gg|good game)\b/.test(m)?CHAT.replyGG:/(noob|trash|bad|ez|suck|loser|bot)/.test(m)?CHAT.replyInsult:/(team|truce|friend|ally)/.test(m)?CHAT.replyTeam:/\?$/.test(m)?CHAT.replyQ:CHAT.reply;
   const n=Math.random()<0.35?2:1,used=[];
   for(let i=0;i<n;i++){
     const named=ents.find(o=>!o.isPlayer&&o.alive&&m.includes(o.name.toLowerCase())&&!used.includes(o));
     const b=named||randBot(used);if(!b)break;used.push(b);
-    chatLater(b,gen(pool,{p,r:Math.max(1,board.indexOf(player)+1),n:player.kills}),rand(0.8,2.6)+i*1.2);
+    chatLater(b,gen(pool,o),rand(0.8,2.6)+i*1.4,true);
   }
 }
 function updateChat(dt){
   if(state==='menu')return;
-  for(let i=chatQ.length-1;i>=0;i--){const q=chatQ[i];if(time>=q.t){chatQ.splice(i,1);if(q.e.name)chatSay(q.e,q.text);}}
-  banterT-=dt;if(banterT<=0){banterT=rand(4,10);
+  chatQ.sort((a,b)=>(b.prio?1:0)-(a.prio?1:0)||a.t-b.t);
+  for(let i=0;i<chatQ.length;i++){const q=chatQ[i];if(time<q.t)continue;
+    if(time-q.due>(q.prio?10:3)){chatQ.splice(i--,1);continue;}                 // stale, drop it
+    if(time-lastBotChat<(q.prio?0.55:5.5))break;                                // rate limit
+    chatQ.splice(i,1);if(q.e.name){chatSay(q.e,q.text);lastBotChat=time;}break;}
+  banterT-=dt;if(banterT<=0&&time-lastBotChat>3){banterT=rand(14,26);
     const a=randBot([]),b=a&&randBot([a]);if(a&&b){const line=gen(CHAT.banter,{a:b.name});chatSay(a,line);
       if(line.toLowerCase().includes(b.name.toLowerCase())&&Math.random()<0.6)chatLater(b,gen(CHAT.reply,{p:a.name}),rand(1,2.5));}}
   for(const d of chatLog.children)if(time-d.t>18)d.classList.add('old');
@@ -486,7 +516,7 @@ function tickCell(e,dt){
   e.r=e.c.headR*(1+0.5*sf);
   let t=0;for(const th of TIERS)if(e.score>=th)t++;
   while(e.tier<t){e.tier++;onTier(e,e.tier);}
-  e.abCd-=dt;e.buffT-=dt;e.fortT-=dt;e.vanishT-=dt;e.dashT-=dt;
+  if(e.pariahT>0)e.pariahT-=dt;e.abCd-=dt;e.buffT-=dt;e.fortT-=dt;e.vanishT-=dt;e.dashT-=dt;
   if(e.slowT>0){e.slowT-=dt;if(e.slowT<=0)e.slowMul=1;}
   if(e.poisonT>0){e.poisonT-=dt;if(Math.random()<dt*10)burst(e.x,e.y,'#8aff5a',1,50,2.5,0.5);
     damage(e,e.poisonDps*dt,e.poisonSrc&&e.poisonSrc.alive?e.poisonSrc:null,e.x,e.y,undefined,true);if(!e.alive)return;}
@@ -615,7 +645,7 @@ function botThink(e,dt){
   let threat=null,td=1e9,prey=null,ps=-1e9;
   for(const o of ents){if(o===e||!o.alive||o.vanishT>0)continue;const dx=o.x-e.x,dy=o.y-e.y;if(Math.abs(dx)>700||Math.abs(dy)>700)continue;
     const d=Math.hypot(dx,dy);if(d<td){td=d;threat=o;}
-    if(d<600&&o.invuln<=0&&o.rt.length>2){const s=(1-o.hp/maxHp(o))*1.4+(atk(e)/atk(o))*0.3+(o.isPlayer?(huntersOfPlayer(e)>=BAL.maxPlayerHunters?-9:-0.15):0)-d/600-(o.c.stealth?0.4:0);if(s>ps){ps=s;prey=o;}}}
+    if(d<600&&o.invuln<=0&&o.rt.length>2){const s=(1-o.hp/maxHp(o))*1.4+(atk(e)/atk(o))*0.3+(o.isPlayer?(o.pariahT>0?1.5:huntersOfPlayer(e)>=BAL.maxPlayerHunters?-9:-0.15):0)-d/600-(o.c.stealth?0.4:0);if(s>ps){ps=s;prey=o;}}}
   // danger from enemy turrets when weak
   let turretDanger=null;
   for(const g of eggs)if(g.owner&&g.owner!==e&&!e.c.stealth&&Math.hypot(g.x-e.x,g.y-e.y)<560&&hpR<0.5){turretDanger=g;break;}
@@ -638,7 +668,8 @@ function botThink(e,dt){
     opts.push(['orb',0.55+rand(0,0.25)]);
     opts.sort((a,b)=>b[1]-a[1]);const m=opts[0][0];
     e.commitT=rand(1.5,3.2);
-    if(m==='egg'){e.mode='egg';e.tgt=eggT;}
+    if(player&&player.alive&&player.pariahT>0&&player.invuln<=0&&Math.hypot(player.x-e.x,player.y-e.y)<1400&&hpR>BAL.botFleeHp){e.mode='hunt';e.tgt=player;}
+    else if(m==='egg'){e.mode='egg';e.tgt=eggT;}
     else if(m==='hunt'){e.mode='hunt';e.tgt=prey;}
     else{const o=nearestOrb(e,700);if(o){e.mode='orb';e.tgt=o;}else{e.mode='wander';e.tgt=null;const p=randInDisk(R-300);e.tx=p.x;e.ty=p.y;}}
   }
@@ -1090,7 +1121,7 @@ addEventListener('mouseup',e=>{if(e.button===0)mouseBoost=false;});
 addEventListener('blur',()=>{mouseBoost=keyBoost=touchBoost=false;});
 addEventListener('keydown',e=>{
   if(document.activeElement===chatIn){
-    if(e.key==='Enter'){const t=chatIn.value.trim().slice(0,90);if(t&&player){chatSay(player,t);chatReply(t);}chatIn.value='';chatIn.blur();}
+    if(e.key==='Enter'){const t=chatIn.value.trim().slice(0,90);if(t&&player){const nm=normChat(t);let shown=t;SLUR_RE.lastIndex=0;let mm;while((mm=SLUR_RE.exec(nm)))shown=shown.slice(0,mm.index)+shown[mm.index]+'*'.repeat(mm[0].length-1)+shown.slice(mm.index+mm[0].length);chatSay(player,shown);chatReply(t,nm);}chatIn.value='';chatIn.blur();}
     else if(e.key==='Escape'){chatIn.value='';chatIn.blur();}
     return;
   }
